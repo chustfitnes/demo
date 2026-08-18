@@ -727,14 +727,57 @@ Output:`;
     } 
     
     if (parsedArray.length === 0 && (!responseText || responseText.length === 0)) {
-      // Fallback simple regex parsing (agar hamma AI ishlamasa)
-      const lines = text.split('\n').filter(l => l.trim().length > 0);
-      parsedArray = lines.map(line => {
-        const qtyMatch = line.match(/(\d+)\s*(ta|dona|rulon|metr|quti|dan)/i) || line.match(/^(\d+)/);
-        const quantity = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
-        const searchStr = line.replace(qtyMatch ? qtyMatch[0] : '', '').replace(/dan/gi, '').trim().replace(/^[^\w\d]+|[^\w\d]+$/g, '');
-        return { matchedText: line, searchStr, quantity };
-      });
+      // 20-year Senior Developer Fallback Logic: Token-based smart parser
+      // Handles multiple items in a single line e.g. "GEL 10ta sovun 5ta shampun 7ta"
+      const normalized = text.replace(/[,;+]/g, ' ').replace(/\s+/g, ' ');
+      const tokens = normalized.split(/\s+/);
+      let currentName = [];
+      const noiseWords = ['dan', 'artikul', 'artikuldagi', 'razmer', 'talik'];
+      const unitRegex = /^(ta|dona|rulon|metr|quti|kg|litr|upakovka|blok|pachka)$/i;
+
+      for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        
+        // 1. Is it a combined number+unit? e.g. "10ta", "5dona"
+        const combinedQtyMatch = token.match(/^(\d+)(ta|dona|rulon|metr|quti|kg|litr|upakovka|blok|pachka)$/i);
+        
+        // 2. Is it a standalone number with the next word as a unit? e.g. "10 ta"
+        const isStandaloneNumber = /^\d+$/.test(token);
+        const hasNextUnit = isStandaloneNumber && (i + 1 < tokens.length) && unitRegex.test(tokens[i+1]);
+
+        if (combinedQtyMatch) {
+          const qty = parseInt(combinedQtyMatch[1], 10);
+          const rawSearchStr = currentName.join(' ').trim();
+          const cleanSearchStr = rawSearchStr.split(' ').filter(w => !noiseWords.includes(w.toLowerCase())).join(' ').trim();
+          
+          if (cleanSearchStr.length > 0) {
+            parsedArray.push({ matchedText: `${rawSearchStr} ${token}`, searchStr: cleanSearchStr, quantity: qty });
+          }
+          currentName = [];
+        } else if (hasNextUnit) {
+          const qty = parseInt(token, 10);
+          const rawSearchStr = currentName.join(' ').trim();
+          const cleanSearchStr = rawSearchStr.split(' ').filter(w => !noiseWords.includes(w.toLowerCase())).join(' ').trim();
+          
+          if (cleanSearchStr.length > 0) {
+            parsedArray.push({ matchedText: `${rawSearchStr} ${token} ${tokens[i+1]}`, searchStr: cleanSearchStr, quantity: qty });
+          }
+          currentName = [];
+          i++; // Skip the next unit word
+        } else {
+          // Keep building the product name
+          currentName.push(token);
+        }
+      }
+
+      // Any leftover text gets captured with default qty = 1
+      if (currentName.length > 0) {
+        const rawSearchStr = currentName.join(' ').trim();
+        const cleanSearchStr = rawSearchStr.split(' ').filter(w => !noiseWords.includes(w.toLowerCase())).join(' ').trim();
+        if (cleanSearchStr.length > 0) {
+          parsedArray.push({ matchedText: rawSearchStr, searchStr: cleanSearchStr, quantity: 1 });
+        }
+      }
     }
 
     const results = [];
