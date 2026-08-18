@@ -145,7 +145,7 @@ Javob faqat Markdown formatida chiroyli sarlavhalar va ajratishlar bilan bo'lsin
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'groq/compound',
+        model: 'openai/gpt-oss-120b',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 1500,
         temperature: 0.6,
