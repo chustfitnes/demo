@@ -270,10 +270,10 @@ const ProductGridItem = React.forwardRef(({
         {product.images && product.images.length > 0 ? (
           <>
             <img 
-              src={product.images[0].url.replace('/upload/', '/upload/c_limit,w_400,q_auto,f_auto/')} 
+              src={product.images[0].url.replace('/upload/', '/upload/e_background_removal/c_limit,w_400,q_auto,f_auto/')} 
               loading="lazy" 
               alt={product.brand || product.artikul} 
-              className="w-full h-full object-contain p-2 mix-blend-multiply transition-transform duration-300 group-hover/img:scale-110" 
+              className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover/img:scale-110" 
             />
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 backdrop-blur-sm">
               <div className="bg-white/30 p-2.5 rounded-full text-white shadow-lg backdrop-blur-md transform scale-90 group-hover/img:scale-100 transition-transform duration-300">
