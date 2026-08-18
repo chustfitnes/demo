@@ -140,9 +140,22 @@ exports.getSalesReport = async (req, res) => {
 
     const orders = await Order.find(match).populate('items.product', 'brand collection artikul images unit').lean();
 
+    // Get Returns for accurate KPI
+    const returnsMatch = { status: { $ne: 'cancelled' } };
+    if (startDate || endDate) {
+      returnsMatch.createdAt = {};
+      if (startDate) returnsMatch.createdAt.$gte = new Date(startDate);
+      if (endDate) returnsMatch.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
+    }
+    const returns = await Return.find(returnsMatch).lean();
+    let totalReturnsAmount = 0;
+    returns.forEach(r => totalReturnsAmount += (r.totalRefundAmount || 0));
+
     let totalRevenue = 0;
     let totalOrders = orders.length;
-    let totalQuantity = 0;
+    let totalQuantity = 0; // Sotilgan
+    let totalReturnedQuantity = 0; // Qaytarilgan
+    let totalNetQuantity = 0; // Sof
     let totalProfit = 0;
     let totalDebt = 0;
     
@@ -185,12 +198,24 @@ exports.getSalesReport = async (req, res) => {
                 image: item.product.images && item.product.images.length > 0 ? item.product.images[0].url : null,
                 unit: item.product.unit || 'dona',
                 quantity: 0,
+                returnedQuantity: 0,
+                netQuantity: 0,
                 revenue: 0
               };
             }
+            const returnedQ = item.returnedQuantity || 0;
+            const netQ = Math.max(0, item.quantity - returnedQ);
+            // Bug Fix: `??` ishlatildi, shunday qilib `0` ni yolg'on deb hisoblamaydi
+            const netRevenue = item.subtotal ?? (netQ * item.unitPrice * (1 - (item.discount || 0) / 100));
+
             productStats[pId].quantity += item.quantity;
-            productStats[pId].revenue += (item.subtotal || (item.quantity * item.unitPrice) || 0);
+            productStats[pId].returnedQuantity += returnedQ;
+            productStats[pId].netQuantity += netQ;
+            productStats[pId].revenue += netRevenue;
+
             totalQuantity += item.quantity;
+            totalReturnedQuantity += returnedQ;
+            totalNetQuantity += netQ;
          }
        });
     });
@@ -248,10 +273,13 @@ exports.getSalesReport = async (req, res) => {
        data: {
          kpi: {
            revenue: totalRevenue,
+           returnsAmount: totalReturnsAmount,
            profit: hideSecret ? null : totalProfit,
            debt: hideSecret ? null : totalDebt,
            orders: totalOrders,
-           quantity: totalQuantity
+           quantity: totalQuantity,
+           returnedQuantity: totalReturnedQuantity,
+           netQuantity: totalNetQuantity
          },
          paymentStats,
          products: productsArray,
@@ -283,6 +311,8 @@ exports.exportSalesExcel = async (req, res) => {
     const productStats = {};
     let totalRevenue = 0;
     let totalQuantity = 0;
+    let totalReturnedQuantity = 0;
+    let totalNetQuantity = 0;
     let totalProfit = 0;
     let totalDebt = 0;
 
@@ -303,14 +333,24 @@ exports.exportSalesExcel = async (req, res) => {
                 artikul: item.product.artikul || '-',
                 unit: item.product.unit || 'dona',
                 quantity: 0,
+                returnedQuantity: 0,
+                netQuantity: 0,
                 revenue: 0
               };
             }
+            const returnedQ = item.returnedQuantity || 0;
+            const netQ = Math.max(0, item.quantity - returnedQ);
+            const netRevenue = item.subtotal ?? (netQ * item.unitPrice * (1 - (item.discount || 0) / 100));
+
             productStats[pId].quantity += item.quantity;
-            productStats[pId].revenue += (item.subtotal || (item.quantity * item.unitPrice) || 0);
+            productStats[pId].returnedQuantity += returnedQ;
+            productStats[pId].netQuantity += netQ;
+            productStats[pId].revenue += netRevenue;
             
-            totalRevenue += (item.subtotal || (item.quantity * item.unitPrice) || 0);
+            totalRevenue += netRevenue;
             totalQuantity += item.quantity;
+            totalReturnedQuantity += returnedQ;
+            totalNetQuantity += netQ;
          }
        });
     });
@@ -385,7 +425,7 @@ exports.exportSalesExcel = async (req, res) => {
     }
 
     let currentRow = 8;
-    const headers = ['#', 'Mahsulot nomi', 'Artikul', 'O\'lchov Birligi', 'Sotilgan Qismi', 'Umumiy Tushum'];
+    const headers = ['#', 'Mahsulot nomi', 'Artikul', 'O\'lchov Birligi', 'Sotildi', 'Qaytdi', 'Sof Sotuv', 'Umumiy Tushum'];
     const headerRow = sheet.getRow(currentRow);
     headers.forEach((h, i) => {
       const cell = headerRow.getCell(i + 1);
@@ -403,18 +443,22 @@ exports.exportSalesExcel = async (req, res) => {
     sheet.getColumn(2).width = 35;
     sheet.getColumn(3).width = 20;
     sheet.getColumn(4).width = 15;
-    sheet.getColumn(5).width = 20;
-    sheet.getColumn(6).width = 25;
+    sheet.getColumn(5).width = 15;
+    sheet.getColumn(6).width = 15;
+    sheet.getColumn(7).width = 15;
+    sheet.getColumn(8).width = 25;
 
     currentRow++;
 
     productsArray.forEach((row, index) => {
       const dataRow = sheet.getRow(currentRow);
-      dataRow.values = [index + 1, row.name, row.artikul, row.unit, row.quantity, row.revenue];
+      dataRow.values = [index + 1, row.name, row.artikul, row.unit, row.quantity, row.returnedQuantity, row.netQuantity, row.revenue];
       
       dataRow.getCell(4).alignment = { horizontal: 'center' };
       dataRow.getCell(5).alignment = { horizontal: 'center' };
-      dataRow.getCell(6).numFmt = '#,##0" so\'m"'; 
+      dataRow.getCell(6).alignment = { horizontal: 'center' };
+      dataRow.getCell(7).alignment = { horizontal: 'center' };
+      dataRow.getCell(8).numFmt = '#,##0" so\'m"'; 
 
       dataRow.eachCell({ includeEmpty: true }, (cell) => {
         cell.border = {

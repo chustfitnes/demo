@@ -201,6 +201,8 @@ const ReportsPage = () => {
   );
 
   const totalFilteredQuantity = filteredProducts.reduce((sum, p) => sum + p.quantity, 0);
+  const totalFilteredReturnedQuantity = filteredProducts.reduce((sum, p) => sum + (p.returnedQuantity || 0), 0);
+  const totalFilteredNetQuantity = filteredProducts.reduce((sum, p) => sum + (p.netQuantity || 0), 0);
   const totalFilteredRevenue = filteredProducts.reduce((sum, p) => sum + p.revenue, 0);
 
   if (loading && !data) {
@@ -291,19 +293,31 @@ const ReportsPage = () => {
         </div>
 
         {/* KPI Cards Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 lg:gap-5">
-          <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 md:col-span-1 lg:col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 lg:gap-5">
+          <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 lg:col-span-2">
             <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4 text-tertiary" />
-              Jami Tushum
+              Sof Tushum
             </h4>
             <div className="text-[24px] lg:text-[28px] font-[700] text-primary tracking-tight">
               {formatMoney(kpi.revenue)}
             </div>
           </div>
 
+          {(kpi.returnsAmount > 0) && (
+            <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 lg:col-span-2">
+              <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
+                <TrendingDown className="w-4 h-4 text-rose-500" />
+                Vozvrat Summasi
+              </h4>
+              <div className="text-[24px] lg:text-[28px] font-[700] text-rose-600 dark:text-rose-400 tracking-tight">
+                {formatMoney(kpi.returnsAmount)}
+              </div>
+            </div>
+          )}
+
           {kpi.profit !== null && (
-            <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 md:col-span-1 lg:col-span-2">
+            <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 lg:col-span-2">
               <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
                 <TrendingUp className="w-4 h-4 text-emerald-500" />
                 Sof Foyda
@@ -315,13 +329,35 @@ const ReportsPage = () => {
           )}
 
           {kpi.debt !== null && (
-            <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 md:col-span-1 lg:col-span-2">
+            <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 lg:col-span-2">
               <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
                 <TrendingDown className="w-4 h-4 text-rose-500" />
                 Jami Qarz / Nasiya
               </h4>
               <div className="text-[24px] lg:text-[28px] font-[700] text-rose-600 dark:text-rose-400 tracking-tight">
                 {formatMoney(kpi.debt)}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-1 lg:col-span-2">
+            <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
+              <Package className="w-4 h-4 text-tertiary" />
+              Sof Sotilgan Miqdor
+            </h4>
+            <div className="text-[22px] lg:text-[24px] font-[700] text-primary tracking-tight">
+              {formatNumber(kpi.netQuantity ?? kpi.quantity)}
+            </div>
+          </div>
+
+          {(kpi.returnedQuantity > 0) && (
+            <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-1 lg:col-span-2">
+              <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
+                <Package className="w-4 h-4 text-rose-500" />
+                Qaytarilgan Miqdor
+              </h4>
+              <div className="text-[22px] lg:text-[24px] font-[700] text-rose-600 dark:text-rose-400 tracking-tight">
+                {formatNumber(kpi.returnedQuantity)}
               </div>
             </div>
           )}
@@ -335,18 +371,8 @@ const ReportsPage = () => {
               {formatNumber(kpi.orders)}
             </div>
           </div>
-
-          <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-1 lg:col-span-2">
-            <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
-              <Package className="w-4 h-4 text-tertiary" />
-              Sotilgan Miqdor
-            </h4>
-            <div className="text-[22px] lg:text-[24px] font-[700] text-primary tracking-tight">
-              {formatNumber(kpi.quantity)}
-            </div>
-          </div>
           
-          <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-2 lg:col-span-2">
+          <div className="bg-surface rounded-xl p-4 border border-subtle shadow-sm flex flex-col justify-between col-span-1 lg:col-span-2">
             <h4 className="text-[12px] font-[600] text-secondary tracking-wide flex items-center gap-2 mb-2">
               <FileSpreadsheet className="w-4 h-4 text-tertiary" />
               O'rtacha Chek
@@ -594,6 +620,18 @@ const ReportsPage = () => {
                   </th>
                   <th 
                     className="px-5 py-3.5 text-[11px] font-[600] text-secondary uppercase tracking-wider text-right cursor-pointer hover:bg-subtle/50 transition-colors group"
+                    onClick={() => handleSort('returnedQuantity')}
+                  >
+                    <div className="flex items-center justify-end">Qaytdi <SortIcon columnKey="returnedQuantity" /></div>
+                  </th>
+                  <th 
+                    className="px-5 py-3.5 text-[11px] font-[600] text-secondary uppercase tracking-wider text-right cursor-pointer hover:bg-subtle/50 transition-colors group"
+                    onClick={() => handleSort('netQuantity')}
+                  >
+                    <div className="flex items-center justify-end">Sof Sotuv <SortIcon columnKey="netQuantity" /></div>
+                  </th>
+                  <th 
+                    className="px-5 py-3.5 text-[11px] font-[600] text-secondary uppercase tracking-wider text-right cursor-pointer hover:bg-subtle/50 transition-colors group"
                     onClick={() => handleSort('revenue')}
                   >
                     <div className="flex items-center justify-end">Tushum <SortIcon columnKey="revenue" /></div>
@@ -641,7 +679,21 @@ const ReportsPage = () => {
                         </div>
                       </td>
                       <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                        <span className="text-[14px] font-[600] text-primary">{formatMoney(p.revenue)}</span>
+                        <div className="flex items-end justify-end gap-1">
+                          <span className={`text-[14px] font-[600] ${p.returnedQuantity > 0 ? 'text-rose-500' : 'text-tertiary'}`}>
+                            {formatNumber(p.returnedQuantity || 0)}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                        <div className="flex items-end justify-end gap-1">
+                          <span className="text-[14px] font-[600] text-primary">{formatNumber(p.netQuantity ?? p.quantity)}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                        <span className={`text-[14px] font-[600] ${(p.revenue === 0 && p.returnedQuantity > 0) ? 'text-rose-500 line-through opacity-70' : 'text-primary'}`}>
+                          {formatMoney(p.revenue)}
+                        </span>
                       </td>
                     </tr>
                   ))
@@ -655,6 +707,12 @@ const ReportsPage = () => {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <span className="text-[14px] font-[700] text-primary">{formatNumber(totalFilteredQuantity)}</span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <span className="text-[14px] font-[700] text-rose-500">{formatNumber(totalFilteredReturnedQuantity)}</span>
+                    </td>
+                    <td className="px-5 py-3 text-right">
+                      <span className="text-[14px] font-[700] text-primary">{formatNumber(totalFilteredNetQuantity)}</span>
                     </td>
                     <td className="px-5 py-3 text-right">
                       <span className="text-[14px] font-[700] text-primary">{formatMoney(totalFilteredRevenue)}</span>
