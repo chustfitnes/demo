@@ -5,11 +5,10 @@ const AiReport = require('../models/AiReport');
 // Groq API - Free tier, fast, reliable
 // Models in priority order
 const GROQ_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama3-70b-8192',
-  'llama-3.1-8b-instant',
-  'llama3-8b-8192',
-  'gemma2-9b-it'
+  'openai/gpt-oss-120b',
+  'groq/compound',
+  'qwen/qwen3.6-27b',
+  'allam-2-7b'
 ];
 
 exports.getAiAnalytics = async (req, res) => {

@@ -698,7 +698,7 @@ Output:`;
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
+            model: 'groq/compound',
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.1
           })
