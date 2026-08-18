@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../hooks/useUsers';
 import { useWarehouses } from '../hooks/useWarehouses';
 import { useAuth } from '../contexts/AuthContext';
-import { Users, Plus, Edit2, Trash2, Shield, X, Building2, Download, Search, Filter } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, Shield, X, Building2, Download, Search, Filter, Package, ShoppingCart, Users2, RotateCcw, BarChart3, Check } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -10,11 +10,11 @@ import { createPortal } from 'react-dom';
 import CustomSelect from '../components/CustomSelect';
 
 const ALL_PERMISSIONS = [
-  { id: 'manage_products', label: 'Maxsulotlarni boshqarish' },
-  { id: 'manage_orders', label: 'Buyurtmalarni boshqarish' },
-  { id: 'manage_customers', label: 'Mijozlarni boshqarish' },
-  { id: 'manage_returns', label: 'Vozvrat qilish' },
-  { id: 'manage_finances', label: 'Moliya va hisobotlar' }
+  { id: 'manage_products', label: 'Maxsulotlarni boshqarish', desc: 'Katalog, narxlar va qoldiqlarni tahrirlash', icon: Package },
+  { id: 'manage_orders', label: 'Buyurtmalarni boshqarish', desc: 'Sotuvlarni rasmiylashtirish va bekor qilish', icon: ShoppingCart },
+  { id: 'manage_customers', label: 'Mijozlarni boshqarish', desc: 'Mijozlar bazasi va qarzdorlik bilan ishlash', icon: Users2 },
+  { id: 'manage_returns', label: 'Vozvrat qilish', desc: 'Sotilgan maxsulotlarni qaytarib olish ruxsati', icon: RotateCcw },
+  { id: 'manage_finances', label: 'Moliya va hisobotlar', desc: 'Kassa va foyda/zarar hisobotlarini ko\'rish', icon: BarChart3 }
 ];
 
 const ROLE_META = {
@@ -169,27 +169,71 @@ const UserModal = ({ isOpen, onClose, user, onSubmit, isSubmitting }) => {
           </div>
 
           {/* permissions */}
-          <div className="mt-4">
-            <label className={`${labelClass} flex items-center gap-1.5 mb-3 text-indigo-500`}>
-              <Shield className="w-3.5 h-3.5" /> Qo'shimcha huquqlar
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div className="mt-6 pt-5 border-t border-subtle">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-[14px] font-[600] text-primary flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-indigo-500" />
+                  Qo'shimcha huquqlar
+                </h3>
+                <p className="text-[12px] text-tertiary mt-0.5">Xodimning tizimdagi maxsus vakolatlari</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 gap-3">
               {ALL_PERMISSIONS.map(perm => {
                 const isChecked = formData.permissions.includes(perm.id);
+                const Icon = perm.icon;
+                
                 return (
                   <label key={perm.id}
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-[12px] border transition-all duration-200 cursor-pointer select-none ${
+                    className={`group relative flex items-center justify-between p-4 rounded-[16px] border-[1.5px] transition-all duration-300 cursor-pointer overflow-hidden ${
                       isChecked 
-                        ? 'bg-indigo-50/50 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/30 shadow-sm' 
+                        ? 'bg-indigo-50/40 dark:bg-indigo-500/5 border-indigo-400/50 shadow-[0_2px_12px_-4px_rgba(99,102,241,0.2)]' 
                         : 'bg-surface border-subtle hover:border-default hover:bg-raised'
                     }`}>
-                    <input type="checkbox"
-                      checked={isChecked}
-                      onChange={() => handlePermissionToggle(perm.id)}
-                      className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 transition-colors cursor-pointer accent-indigo-600" />
-                    <span className={`text-[13px] font-medium transition-colors ${
-                      isChecked ? 'text-indigo-900 dark:text-indigo-300' : 'text-primary'
-                    }`}>{perm.label}</span>
+                    
+                    {/* Background glow on active */}
+                    <div className={`absolute inset-0 bg-gradient-to-r from-indigo-500/0 via-indigo-500/0 to-indigo-500/5 opacity-0 transition-opacity duration-500 ${isChecked ? 'opacity-100' : ''}`} />
+
+                    <div className="flex items-center gap-4 relative z-10">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${
+                        isChecked 
+                          ? 'bg-indigo-500 text-white shadow-sm' 
+                          : 'bg-raised text-tertiary group-hover:text-secondary group-hover:bg-subtle'
+                      }`}>
+                        <Icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={`text-[13.5px] font-[600] transition-colors duration-300 ${
+                          isChecked ? 'text-indigo-950 dark:text-indigo-200' : 'text-primary'
+                        }`}>
+                          {perm.label}
+                        </span>
+                        <span className={`text-[12px] transition-colors duration-300 ${
+                          isChecked ? 'text-indigo-700/80 dark:text-indigo-300/60' : 'text-tertiary'
+                        }`}>
+                          {perm.desc}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Custom Toggle Switch */}
+                    <div className="relative z-10 shrink-0 ml-4">
+                      <div className={`w-11 h-6 rounded-full transition-colors duration-300 ease-in-out relative flex items-center shadow-inner ${
+                        isChecked ? 'bg-indigo-500' : 'bg-[#e5e7eb] dark:bg-zinc-800'
+                      }`}>
+                        <div className={`w-4 h-4 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-out flex items-center justify-center ${
+                          isChecked ? 'translate-x-6' : 'translate-x-1'
+                        }`}>
+                          {isChecked && <Check className="w-2.5 h-2.5 text-indigo-500" strokeWidth={3.5} />}
+                        </div>
+                      </div>
+                      <input type="checkbox"
+                        checked={isChecked}
+                        onChange={() => handlePermissionToggle(perm.id)}
+                        className="sr-only" />
+                    </div>
                   </label>
                 );
               })}
