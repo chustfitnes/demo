@@ -48,7 +48,7 @@ const ProductGridItem = React.forwardRef(({
             src={product.images[0].url.replace('/upload/', '/upload/c_limit,w_600,q_auto,f_auto/')} 
             loading="lazy" 
             alt={product.artikul} 
-            className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+            className="absolute inset-0 w-full h-full object-contain p-4 transition-transform duration-700 group-hover:scale-110" 
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
@@ -269,7 +269,12 @@ const ProductGridItem = React.forwardRef(({
         </div>
         {product.images && product.images.length > 0 ? (
           <>
-            <img src={product.images[0].url.replace('/upload/', '/upload/c_limit,w_400,q_auto,f_auto/')} loading="lazy" alt={product.brand || product.artikul} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-110" />
+            <img 
+              src={product.images[0].url.replace('/upload/', '/upload/c_limit,w_400,q_auto,f_auto/')} 
+              loading="lazy" 
+              alt={product.brand || product.artikul} 
+              className="w-full h-full object-contain p-2 mix-blend-multiply transition-transform duration-300 group-hover/img:scale-110" 
+            />
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 backdrop-blur-sm">
               <div className="bg-white/30 p-2.5 rounded-full text-white shadow-lg backdrop-blur-md transform scale-90 group-hover/img:scale-100 transition-transform duration-300">
                 <Eye className="w-6 h-6" />
