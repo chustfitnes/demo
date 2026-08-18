@@ -274,6 +274,19 @@ const ProductGridItem = React.forwardRef(({
               loading="lazy" 
               alt={product.brand || product.artikul} 
               className="w-full h-full object-contain p-2 transition-transform duration-300 group-hover/img:scale-110" 
+              onError={(e) => {
+                const img = e.target;
+                if (!img.dataset.retried) {
+                  // Fallback 1: Try Pixelz Add-on if Native AI fails
+                  img.dataset.retried = "1";
+                  img.src = product.images[0].url.replace('/upload/', '/upload/e_pixelz/c_limit,w_400,q_auto,f_auto/');
+                } else if (img.dataset.retried === "1") {
+                  // Fallback 2: Load original image and apply CSS mix-blend-multiply as a last resort
+                  img.dataset.retried = "2";
+                  img.src = product.images[0].url.replace('/upload/', '/upload/c_limit,w_400,q_auto,f_auto/');
+                  img.classList.add('mix-blend-multiply');
+                }
+              }}
             />
             <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity z-10 backdrop-blur-sm">
               <div className="bg-white/30 p-2.5 rounded-full text-white shadow-lg backdrop-blur-md transform scale-90 group-hover/img:scale-100 transition-transform duration-300">
