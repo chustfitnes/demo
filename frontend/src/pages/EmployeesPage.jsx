@@ -169,70 +169,35 @@ const UserModal = ({ isOpen, onClose, user, onSubmit, isSubmitting }) => {
           </div>
 
           {/* permissions */}
-          <div className="mt-6 pt-5 border-t border-subtle">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-[14px] font-[600] text-primary flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-indigo-500" />
-                  Qo'shimcha huquqlar
-                </h3>
-                <p className="text-[12px] text-tertiary mt-0.5">Xodimning tizimdagi maxsus vakolatlari</p>
-              </div>
-            </div>
+          <div className="mt-5 pt-4 border-t border-subtle">
+            <h3 className="text-[11px] font-[600] text-secondary uppercase tracking-[0.05em] mb-3">
+              Qo'shimcha huquqlar
+            </h3>
             
-            <div className="grid grid-cols-1 gap-3">
+            <div className="flex flex-col space-y-1">
               {ALL_PERMISSIONS.map(perm => {
                 const isChecked = formData.permissions.includes(perm.id);
-                const Icon = perm.icon;
                 
                 return (
                   <label key={perm.id}
-                    className={`group relative flex items-center justify-between p-4 rounded-[16px] border-[1.5px] transition-all duration-300 cursor-pointer overflow-hidden ${
-                      isChecked 
-                        ? 'bg-indigo-50/40 dark:bg-indigo-500/5 border-indigo-400/50 shadow-[0_2px_12px_-4px_rgba(99,102,241,0.2)]' 
-                        : 'bg-surface border-subtle hover:border-default hover:bg-raised'
-                    }`}>
-                    
-                    {/* Background glow on active */}
-                    <div className={`absolute inset-0 bg-gradient-to-r from-indigo-500/0 via-indigo-500/0 to-indigo-500/5 opacity-0 transition-opacity duration-500 ${isChecked ? 'opacity-100' : ''}`} />
-
-                    <div className="flex items-center gap-4 relative z-10">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${
-                        isChecked 
-                          ? 'bg-indigo-500 text-white shadow-sm' 
-                          : 'bg-raised text-tertiary group-hover:text-secondary group-hover:bg-subtle'
-                      }`}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className={`text-[13.5px] font-[600] transition-colors duration-300 ${
-                          isChecked ? 'text-indigo-950 dark:text-indigo-200' : 'text-primary'
-                        }`}>
-                          {perm.label}
-                        </span>
-                        <span className={`text-[12px] transition-colors duration-300 ${
-                          isChecked ? 'text-indigo-700/80 dark:text-indigo-300/60' : 'text-tertiary'
-                        }`}>
-                          {perm.desc}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Custom Toggle Switch */}
-                    <div className="relative z-10 shrink-0 ml-4">
-                      <div className={`w-11 h-6 rounded-full transition-colors duration-300 ease-in-out relative flex items-center shadow-inner ${
-                        isChecked ? 'bg-indigo-500' : 'bg-[#e5e7eb] dark:bg-zinc-800'
-                      }`}>
-                        <div className={`w-4 h-4 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)] transition-transform duration-300 ease-out flex items-center justify-center ${
-                          isChecked ? 'translate-x-6' : 'translate-x-1'
-                        }`}>
-                          {isChecked && <Check className="w-2.5 h-2.5 text-indigo-500" strokeWidth={3.5} />}
-                        </div>
-                      </div>
-                      <input type="checkbox"
+                    className="flex items-start gap-3 p-2.5 -mx-2.5 rounded-lg hover:bg-raised transition-colors cursor-pointer select-none"
+                  >
+                    <div className="relative flex items-center pt-[1px]">
+                      <input 
+                        type="checkbox"
                         checked={isChecked}
                         onChange={() => handlePermissionToggle(perm.id)}
-                        className="sr-only" />
+                        className="w-[16px] h-[16px] rounded-[4px] border-default text-primary focus:ring-0 cursor-pointer"
+                        style={{ accentColor: 'var(--color-primary, #111827)' }}
+                      />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className={`text-[13.5px] leading-none font-[500] ${isChecked ? 'text-primary' : 'text-secondary'}`}>
+                        {perm.label}
+                      </span>
+                      <span className="text-[12px] leading-tight text-tertiary mt-1">
+                        {perm.desc}
+                      </span>
                     </div>
                   </label>
                 );
