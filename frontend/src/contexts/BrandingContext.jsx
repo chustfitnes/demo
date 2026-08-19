@@ -29,12 +29,31 @@ const CAT_STORAGE_KEY = 'crm_categories';
 const UNIT_STORAGE_KEY = 'crm_units';
 
 // ─── Document and CSS applicator ──────────────────────────────────────────────
+function getContrastYIQ(hexcolor) {
+  if (!hexcolor) return '#FFFFFF';
+  if (hexcolor.slice(0, 1) === '#') {
+    hexcolor = hexcolor.slice(1);
+  }
+  if (hexcolor.length === 3) {
+    hexcolor = hexcolor.split('').map(h => h + h).join('');
+  }
+  const r = parseInt(hexcolor.substr(0, 2), 16);
+  const g = parseInt(hexcolor.substr(2, 2), 16);
+  const b = parseInt(hexcolor.substr(4, 2), 16);
+  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  return yiq >= 128 ? '#0F0F0E' : '#FFFFFF';
+}
+
 function applyBrandingUI(branding) {
   if (!branding) return;
   const root = document.documentElement;
   if (branding.accentColor) {
     root.style.setProperty('--color-accent', branding.accentColor);
     root.style.setProperty('--accent-primary', branding.accentColor);
+    
+    // Tugmalar ustidagi matn rangi orqa fonga qarab moslashishi uchun
+    const contrastColor = getContrastYIQ(branding.accentColor);
+    root.style.setProperty('--text-on-accent', contrastColor);
   }
   
   if (branding.logoUrl) {
