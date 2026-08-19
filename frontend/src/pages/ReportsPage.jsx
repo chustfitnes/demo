@@ -151,19 +151,32 @@ const ReportsPage = () => {
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-overlay border border-subtle p-3 rounded-lg shadow-xl z-50">
-          <p className="text-[12px] font-[500] text-tertiary mb-2">{label}</p>
-          {payload.map((entry, index) => (
-            <div key={index} className="flex items-center justify-between gap-6 mb-1 last:mb-0">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }}></div>
-                <span className="text-[13px] font-[500] text-secondary">{entry.name}</span>
+        <div className="bg-surface/95 backdrop-blur-xl border border-subtle p-4 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] min-w-[200px] z-50 transition-all">
+          <div className="flex items-center gap-2 mb-3 border-b border-subtle pb-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
+            <p className="text-[13px] font-[600] text-secondary">{label}</p>
+          </div>
+          <div className="space-y-3.5">
+            {payload.map((entry, index) => (
+              <div key={index} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <div 
+                    className="w-2.5 h-2.5 rounded-full ring-2 ring-app shadow-sm shrink-0" 
+                    style={{ backgroundColor: entry.color }}
+                  />
+                  <span className="text-[12px] font-[600] text-tertiary uppercase tracking-wider">{entry.name}</span>
+                </div>
+                <div className="pl-4 ml-0.5 flex items-baseline gap-1">
+                  <p className="text-[15px] font-[700] text-primary tabular-nums tracking-tight">
+                    {formatNumber(entry.value)}
+                  </p>
+                  <span className="text-[11px] font-[600] text-secondary">
+                    {currencySymbol}
+                  </span>
+                </div>
               </div>
-              <p className="text-[14px] font-[700] text-primary">
-                {formatMoney(entry.value)}
-              </p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       );
     }
@@ -385,54 +398,85 @@ const ReportsPage = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
           {/* Main Chart Section */}
-          <div className="lg:col-span-2 xl:col-span-2 bg-surface border border-subtle rounded-xl p-6 shadow-sm flex flex-col">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h2 className="text-[16px] font-[700] text-primary">Tushum Dinamikasi</h2>
+          <div className="lg:col-span-2 xl:col-span-2 bg-surface border border-subtle rounded-xl p-6 shadow-sm flex flex-col relative overflow-hidden group">
+            {/* Soft background glow */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none transition-opacity duration-500 opacity-50 group-hover:opacity-100"></div>
+            
+            <div className="flex items-center justify-between mb-8 relative z-10">
+              <div className="flex flex-col gap-1.5">
+                <h2 className="text-[17px] font-[700] text-primary flex items-center gap-2.5 tracking-tight">
+                  Tushum Dinamikasi
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                </h2>
+                <p className="text-[13px] text-tertiary font-[500]">Belgilangan davr uchun daromad o'zgarishi</p>
               </div>
             </div>
             
-            <div className="flex-1 min-h-[300px] w-full mt-2">
+            <div className="flex-1 min-h-[300px] w-full mt-2 relative z-10">
               {chartData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="colorTushum" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={accentColor} stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor={accentColor} stopOpacity={0}/>
+                        <stop offset="0%" stopColor={accentColor} stopOpacity={0.25}/>
+                        <stop offset="50%" stopColor={accentColor} stopOpacity={0.05}/>
+                        <stop offset="100%" stopColor={accentColor} stopOpacity={0}/>
                       </linearGradient>
                       <linearGradient id="colorFoyda" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.25}/>
+                        <stop offset="50%" stopColor="#10b981" stopOpacity={0.05}/>
+                        <stop offset="100%" stopColor="#10b981" stopOpacity={0}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-subtle)" />
+                    <CartesianGrid 
+                      strokeDasharray="4 4" 
+                      vertical={false} 
+                      stroke="var(--border-subtle)" 
+                      opacity={0.7}
+                    />
                     <XAxis 
                       dataKey="displayDate" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
+                      tick={{ fontSize: 11, fill: 'var(--text-tertiary)', fontWeight: 500 }}
                       dy={12}
+                      minTickGap={30}
                     />
                     <YAxis 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 11, fill: 'var(--text-secondary)' }}
-                      tickFormatter={(value) => value > 0 ? `${(value / 1000000).toFixed(1)}M` : '0'}
+                      tick={{ fontSize: 11, fill: 'var(--text-tertiary)', fontWeight: 500 }}
+                      tickFormatter={(value) => {
+                        if (value === 0) return '0';
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`;
+                        if (value >= 1000) return `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}K`;
+                        return value;
+                      }}
                       dx={-10}
+                      width={65}
                     />
-                    {/* isAnimationActive={false} prevents trembling when moving mouse fast */}
-                    <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border-default)', strokeWidth: 1, strokeDasharray: '4 4' }} isAnimationActive={false} />
+                    <Tooltip 
+                      content={<CustomTooltip />} 
+                      cursor={{ 
+                        stroke: 'var(--border-default)', 
+                        strokeWidth: 1, 
+                        strokeDasharray: '4 4' 
+                      }} 
+                      isAnimationActive={false} 
+                    />
                     
                     <Area 
                       type="monotone" 
                       dataKey="savdo" 
                       name="Tushum"
                       stroke={accentColor} 
-                      strokeWidth={2}
+                      strokeWidth={3}
                       fillOpacity={1} 
                       fill="url(#colorTushum)" 
-                      activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--bg-surface)', fill: accentColor }}
+                      activeDot={{ r: 6, strokeWidth: 3, stroke: 'var(--bg-app)', fill: accentColor }}
                       isAnimationActive={false}
                     />
                     {kpi.profit !== null && (
@@ -441,10 +485,10 @@ const ReportsPage = () => {
                         dataKey="foyda" 
                         name="Sof Foyda"
                         stroke="#10b981" 
-                        strokeWidth={2}
+                        strokeWidth={3}
                         fillOpacity={1} 
                         fill="url(#colorFoyda)" 
-                        activeDot={{ r: 5, strokeWidth: 2, stroke: 'var(--bg-surface)', fill: "#10b981" }}
+                        activeDot={{ r: 6, strokeWidth: 3, stroke: 'var(--bg-app)', fill: "#10b981" }}
                         isAnimationActive={false}
                       />
                     )}
@@ -452,7 +496,7 @@ const ReportsPage = () => {
                 </ResponsiveContainer>
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center text-center opacity-70">
-                   <TrendingDown className="w-8 h-8 text-tertiary mb-3" />
+                   <TrendingDown className="w-10 h-10 text-tertiary mb-3 opacity-50" />
                    <p className="text-[14px] font-[600] text-secondary">Ma'lumot topilmadi</p>
                 </div>
               )}
