@@ -88,13 +88,29 @@ exports.createReturn = async (req, res) => {
         processedById: req.user ? req.user._id : null
       }], { session });
 
-      // 4. Stock qaytarish — atomic $inc
+      // 4. Stock qaytarish — Brak (nuqsonli) tovarlarni sotuv omboridan ajratish
+      const isDefective = reason && (
+        reason.toLowerCase().includes('brak') || 
+        reason.toLowerCase().includes('nuqson') || 
+        reason.toLowerCase().includes('yaroqsiz')
+      );
+
       for (let item of processedItems) {
-        await Product.findByIdAndUpdate(
-          item.product,
-          { $inc: { quantity: item.quantityInRolls, soldQuantity: -item.quantityInRolls } },
-          { session }
-        );
+        if (isDefective) {
+          // Brak bo'lsa — faqat defectiveQuantity ga yoziladi, qayta sotuvga chiqmaydi
+          await Product.findByIdAndUpdate(
+            item.product,
+            { $inc: { defectiveQuantity: item.quantityInRolls } },
+            { session }
+          );
+        } else {
+          // Soz tovar — sotuv zaxirasiga qaytadi
+          await Product.findByIdAndUpdate(
+            item.product,
+            { $inc: { quantity: item.quantityInRolls, soldQuantity: -item.quantityInRolls } },
+            { session }
+          );
+        }
       }
 
       // 5. Order'ni yangilash (pre-save hook totalAmount va debtAmount'ni qayta hisoblaydi)
@@ -102,8 +118,6 @@ exports.createReturn = async (req, res) => {
       const oldDebtAmount = order.debtAmount || 0;
 
       // ✅ FIX: order.save() OLDIN totalAmount ni saqlash (snapshot pattern)
-      // save() dan keyin pre-save hook totalAmount ni o'zgartirishi mumkin
-      // returnRatio shu original summaga nisbatan hisoblanadi
       const snapshotTotalAmount = order.totalAmount || 1;
       const snapshotCashbackEarned = order.cashbackEarned || 0;
       const snapshotCashbackUsed   = order.cashbackUsed   || 0;
@@ -118,10 +132,25 @@ exports.createReturn = async (req, res) => {
       await order.save({ session });
 
       const debtReduction = Math.max(0, oldDebtAmount - order.debtAmount);
+      const cashRefundAmount = Math.max(0, totalRefundAmount - debtReduction);
+
+      // Agar mijoz naqd to'lagan bo'lsa — kassa chiqimi (Refund Payment) rasmiylashtiriladi
+      if (cashRefundAmount > 0) {
+        const Payment = require('../models/Payment');
+        await Payment.create([{
+          order: order._id,
+          customer: order.customer,
+          warehouse: order.warehouse,
+          amount: -cashRefundAmount,
+          method: order.paymentType === 'naqd' ? 'naqd' : 'karta',
+          notes: `Vozvrat chiqimi (#${returnDoc.returnNumber}): Naqd qaytarildi`,
+          receivedBy: req.user ? req.user.name : 'Tizim',
+          receivedById: req.user ? req.user._id : undefined
+        }], { session });
+      }
 
       // ✅ FIX: Integer arithmetic — tiyindagi floating point xatosining oldini olish
-      // returnRatio ni 1,000,000 ga ko'paytiriб butun songa aylantiramiz
-      const returnRatioMicro  = Math.round(totalRefundAmount * 1_000_000 / snapshotTotalAmount);
+      const returnRatioMicro = Math.round(totalRefundAmount * 1_000_000 / snapshotTotalAmount);
       const reversedEarned = Math.round(snapshotCashbackEarned * returnRatioMicro / 1_000_000);
       const reversedUsed   = Math.round(snapshotCashbackUsed   * returnRatioMicro / 1_000_000);
       const cashbackDelta  = reversedUsed - reversedEarned;
@@ -130,7 +159,7 @@ exports.createReturn = async (req, res) => {
         order.customer,
         { 
           $inc: { 
-            totalDebt: -totalRefundAmount, 
+            totalDebt: -debtReduction, 
             totalPurchased: -totalRefundAmount,
             cashbackBalance: cashbackDelta
           } 
@@ -138,25 +167,26 @@ exports.createReturn = async (req, res) => {
         { session }
       );
 
-      // Store credit uchun totalDebt manfiy bo'lishiga ruxsat beramiz.
-      // Safety: totalDebt check olib tashlandi.
+      // TotalDebt hech qachon manfiy bo'lmasligi kafolatlanadi
+      await Customer.updateOne({ _id: order.customer, totalDebt: { $lt: 0 } }, { $set: { totalDebt: 0 } }, { session });
       await Customer.updateOne(
         { _id: order.customer, cashbackBalance: { $lt: 0 } },
         { $set: { cashbackBalance: 0 } },
         { session }
       );
 
-      // syncDeltas ni transaction ichida tayyorlaymiz
+      // ✅ FIX: syncDeltas'da debtDelta bazadagi -debtReduction ga 100% mos bo'ladi (desinxronizatsiya yo'qoladi)
       syncDeltas = {
         products: processedItems.map(item => ({
           id: item.product.toString(),
-          delta: item.quantityInRolls
+          delta: isDefective ? 0 : item.quantityInRolls
         })),
         customer: {
           id: order.customer.toString(),
-          debtDelta: -totalRefundAmount,
+          debtDelta: -debtReduction,
           purchasedDelta: -totalRefundAmount,
-          cashbackDelta: cashbackDelta
+          cashbackDelta: cashbackDelta,
+          cashRefund: cashRefundAmount
         }
       };
 

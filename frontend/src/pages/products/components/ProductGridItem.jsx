@@ -6,6 +6,7 @@ import { haptics } from '../../../utils/haptics';
 import toast from 'react-hot-toast';
 
 const ProductGridItem = React.forwardRef(({
+  onHistoryClick,
   product,
   user,
   cartUnits,
@@ -309,7 +310,7 @@ const ProductGridItem = React.forwardRef(({
       <div className="p-2 sm:p-3 flex-1 flex flex-col">
         {/* Row 1: Artikul & Qty */}
         <div className="flex items-start justify-between gap-1 mb-0.5 sm:mb-1">
-          <div className="text-[14px] sm:text-[18px] font-[800] text-primary tracking-tight leading-none truncate">{product.artikul}</div>
+          <div onClick={() => onHistoryClick && onHistoryClick(product)} className="text-[14px] sm:text-[18px] font-[800] text-primary tracking-tight leading-none truncate cursor-pointer hover:text-blue-600 transition-colors" title="Tarixni ko'rish">{product.artikul}</div>
           <div className={`text-[11px] sm:text-[13px] font-[800] whitespace-nowrap leading-none ${product.quantity <= product.minStock ? 'text-red-600' : 'text-emerald-600'}`}>
             {product.quantity} {product.unit || 'rulon'}
           </div>

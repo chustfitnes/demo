@@ -183,7 +183,20 @@ exports.deleteCustomer = async (req, res) => {
 // @access  Public
 exports.getDebtors = async (req, res) => {
   try {
-    const debtors = await Customer.find({ isActive: true, totalDebt: { $gt: 0 } })
+    
+    const debtorsWithOrders = await Order.aggregate([
+      { $match: { status: { $in: ['confirmed', 'delivered'] }, debtAmount: { $gt: 0 } } },
+      { $group: { _id: '$customer' } }
+    ]);
+    const activeDebtorIds = debtorsWithOrders.map(d => d._id);
+
+    const debtors = await Customer.find({ 
+      isActive: true, 
+      $or: [
+        { totalDebt: { $gt: 0 } },
+        { _id: { $in: activeDebtorIds } }
+      ]
+    })
       .sort({ totalDebt: -1 })
       .lean(); // Add lean() for performance
 
@@ -214,11 +227,50 @@ exports.getDebtors = async (req, res) => {
       statsMap[stat._id.toString()] = stat;
     });
 
-    const debtorsWithStats = debtors.map(c => ({
-      ...c,
-      lastOrderDate: statsMap[c._id.toString()]?.lastOrderDate || null,
-      unpaidOrdersCount: statsMap[c._id.toString()]?.unpaidOrdersCount || 0
-    }));
+    // Aktiv qarz buyurtmalari bo'yicha jami summa va to'langan summani hisoblash
+    const activeDebtOrders = await Order.aggregate([
+      { 
+        $match: { 
+          customer: { $in: debtorIds }, 
+          status: { $in: ['confirmed', 'delivered'] }, 
+          debtAmount: { $gt: 0 } 
+        } 
+      },
+      { 
+        $group: {
+          _id: '$customer',
+          totalActiveOrderAmount: { $sum: '$totalAmount' },
+          totalActiveOrderPaid: { $sum: '$paidAmount' }
+        }
+      }
+    ]);
+
+    const activeOrderMap = {};
+    activeDebtOrders.forEach(a => {
+      activeOrderMap[a._id.toString()] = a;
+    });
+
+    const debtorsWithStats = debtors.map(c => {
+      const cId = c._id.toString();
+      const debt = Math.max(0, c.totalDebt || 0);
+      const activeOrderData = activeOrderMap[cId];
+
+      let initialDebt = debt;
+      let totalPaid = 0;
+
+      if (activeOrderData && activeOrderData.totalActiveOrderAmount > 0) {
+        initialDebt = activeOrderData.totalActiveOrderAmount;
+        totalPaid = activeOrderData.totalActiveOrderPaid;
+      }
+
+      return {
+        ...c,
+        lastOrderDate: statsMap[cId]?.lastOrderDate || null,
+        unpaidOrdersCount: statsMap[cId]?.unpaidOrdersCount || 0,
+        totalPaid: totalPaid,
+        initialDebt: Math.max(initialDebt, debt + totalPaid)
+      };
+    });
 
     res.status(200).json({ success: true, data: debtorsWithStats });
   } catch (error) {

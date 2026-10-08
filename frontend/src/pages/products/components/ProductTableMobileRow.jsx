@@ -6,6 +6,7 @@ import { haptics } from '../../../utils/haptics';
 import toast from 'react-hot-toast';
 
 const ProductTableMobileRow = React.forwardRef(({
+  onHistoryClick,
   product,
   user,
   cartUnits,

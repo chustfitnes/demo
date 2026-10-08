@@ -5,6 +5,7 @@ import { haptics } from '../../../utils/haptics';
 import toast from 'react-hot-toast';
 
 const ProductTableDesktopRow = React.forwardRef(({
+  onHistoryClick,
   product,
   user,
   cartUnits,
@@ -55,7 +56,7 @@ const ProductTableDesktopRow = React.forwardRef(({
           </div>
           <div className="min-w-0 flex flex-col justify-center">
             <div className="flex items-center gap-2">
-              <div className="text-[15px] font-[700] text-primary tracking-tight">{product.artikul}</div>
+              <div onClick={(e) => { e.stopPropagation(); onHistoryClick && onHistoryClick(product); }} className="text-[15px] font-[700] text-primary tracking-tight cursor-pointer hover:text-blue-600 transition-colors" title="Tarixni ko'rish">{product.artikul}</div>
               <button 
                 onClick={(e) => { e.stopPropagation(); openCompareModal(product); }}
                 className="w-6 h-6 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 hover:bg-blue-100 hover:text-blue-700 active:scale-95 transition-all shrink-0"

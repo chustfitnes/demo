@@ -79,14 +79,14 @@ exports.processOrder = async (orderDataInput, user, io) => {
     });
 
     // API Bypass Himoyasi: Narxni bazadagi tan narx bilan tekshirish
-    const effectiveUnitPrice = item.unitPrice * (1 - (item.discount || 0) / 100);
+    const effectiveUnitPrice = Math.round(item.unitPrice * (1 - (item.discount || 0) / 100));
     if (user && user.role !== 'superadmin' && product.costPrice && effectiveUnitPrice < product.costPrice) {
       throw new Error(
         `Xavfsizlik tizimi: "${product.brand || product.artikul}" mahsulotini tan narxidan (${product.costPrice} so'm) arzon sota olmaysiz! Ruxsat etilmagan operatsiya.`
       );
     }
 
-    const itemSubtotal = effectiveUnitPrice * item.quantity;
+    const itemSubtotal = Math.round(effectiveUnitPrice * item.quantity);
     calculatedTotal += itemSubtotal;
   }
 
@@ -94,7 +94,7 @@ exports.processOrder = async (orderDataInput, user, io) => {
   if (!customerDoc) throw new Error('Customer not found');
 
   let finalTotal = orderData.overrideTotalAmount !== undefined
-    ? Number(orderData.overrideTotalAmount)
+    ? Math.round(Number(orderData.overrideTotalAmount))
     : calculatedTotal;
 
   // 3. Cashback hisoblash (o'qish — session shart emas)

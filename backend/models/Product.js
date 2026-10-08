@@ -43,6 +43,7 @@ const productSchema = new mongoose.Schema({
   
   quantity: { type: Number, default: 0, min: 0 },
   soldQuantity: { type: Number, default: 0 },
+  defectiveQuantity: { type: Number, default: 0, min: 0 },
   minStock: { type: Number, default: 4 },
   warehouse: { type: mongoose.Schema.Types.ObjectId, ref: 'Warehouse', required: true },
   images: [{ url: String, publicId: String }],

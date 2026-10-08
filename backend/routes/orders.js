@@ -11,11 +11,13 @@ const {
   sendReceiptImage
 } = require('../controllers/orderController');
 
+const idempotency = require('../middleware/idempotency');
+
 router.get('/stats', getOrderStats);
 
 router.route('/')
   .get(getOrders)
-  .post(createOrder);
+  .post(idempotency, createOrder);
 
 router.route('/:id')
   .get(getOrder);

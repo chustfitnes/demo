@@ -34,7 +34,16 @@ const generateAndSendDailyReport = async (date) => {
     orders.forEach(order => {
       totalRevenue += order.totalAmount || 0;
       totalProfit += order.totalProfit || 0;
-      totalDiscount += order.discount || 0;
+      
+      // Chegirma har bir item bo'yicha hisoblanadi
+      if (order.items && order.items.length > 0) {
+        order.items.forEach(it => {
+          if (it.discount > 0) {
+            const raw = (it.unitPrice || 0) * (it.quantity || 0);
+            totalDiscount += Math.round(raw * (it.discount / 100));
+          }
+        });
+      }
 
       const whName = order.warehouse?.name || 'Noma\'lum filial';
       if (!byBranch[whName]) {
@@ -46,19 +55,28 @@ const generateAndSendDailyReport = async (date) => {
 
     // Bugungi vozvratlar
     const returns = await Return.find({
-      createdAt: { $gte: startOfDay, $lte: endOfDay }
+      createdAt: { $gte: startOfDay, $lte: endOfDay },
+      status: { $ne: 'cancelled' }
     });
 
     let totalReturns = 0;
+    let totalRefundCost = 0;
     returns.forEach(ret => {
       totalReturns += ret.totalRefundAmount || 0;
+      totalRefundCost += ret.totalRefundCost || 0;
     });
+
+    // Haqiqiy sof tushum va sof foyda (Vozvrat chegirilgan)
+    const netRevenue = Math.max(0, totalRevenue - totalReturns);
+    const lostProfit = Math.max(0, totalReturns - totalRefundCost);
+    const netProfit = Math.max(0, totalProfit - lostProfit);
 
     const stats = {
       date: startOfDay,
       totalOrders,
-      totalRevenue,
-      totalProfit,
+      grossRevenue: totalRevenue,
+      totalRevenue: netRevenue,
+      totalProfit: netProfit,
       totalDiscount,
       totalReturns,
       branches: byBranch
@@ -73,7 +91,7 @@ const generateAndSendDailyReport = async (date) => {
 
       const whId = wh._id.toString();
       const whOrders = orders.filter(o => o.warehouse && o.warehouse._id.toString() === whId);
-      const whReturns = returns.filter(r => r.warehouse && r.warehouse.toString() === whId || (r.warehouse && r.warehouse._id && r.warehouse._id.toString() === whId));
+      const whReturns = returns.filter(r => r.warehouse && (r.warehouse.toString() === whId || (r.warehouse._id && r.warehouse._id.toString() === whId)));
 
       let whRevenue = 0;
       let whProfit = 0;
@@ -81,19 +99,33 @@ const generateAndSendDailyReport = async (date) => {
       whOrders.forEach(o => {
         whRevenue += o.totalAmount || 0;
         whProfit += o.totalProfit || 0;
-        whDiscount += o.discount || 0;
+        if (o.items && o.items.length > 0) {
+          o.items.forEach(it => {
+            if (it.discount > 0) {
+              const raw = (it.unitPrice || 0) * (it.quantity || 0);
+              whDiscount += Math.round(raw * (it.discount / 100));
+            }
+          });
+        }
       });
 
       let whTotalReturns = 0;
+      let whRefundCost = 0;
       whReturns.forEach(r => {
         whTotalReturns += r.totalRefundAmount || 0;
+        whRefundCost += r.totalRefundCost || 0;
       });
+
+      const whNetRevenue = Math.max(0, whRevenue - whTotalReturns);
+      const whLostProfit = Math.max(0, whTotalReturns - whRefundCost);
+      const whNetProfit = Math.max(0, whProfit - whLostProfit);
 
       const whStats = {
         date: startOfDay,
         totalOrders: whOrders.length,
-        totalRevenue: whRevenue,
-        totalProfit: whProfit,
+        totalRevenue: whNetRevenue,
+        grossRevenue: whRevenue,
+        totalProfit: whNetProfit,
         totalDiscount: whDiscount,
         totalReturns: whTotalReturns
       };
@@ -132,6 +164,13 @@ exports.getSalesReport = async (req, res) => {
     
     let match = { status: { $ne: 'cancelled' } };
     
+    // ── Filial Izolyatsiyasi (IDOR Himoyasi) ──
+    if (req.user && req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+      match.warehouse = req.user.warehouse;
+    } else if (req.query.warehouse && req.query.warehouse !== 'all' && req.query.warehouse !== 'Barchasi') {
+      match.warehouse = req.query.warehouse;
+    }
+
     if (startDate || endDate) {
       match.createdAt = {};
       if (startDate) match.createdAt.$gte = new Date(startDate);
@@ -142,6 +181,9 @@ exports.getSalesReport = async (req, res) => {
 
     // Get Returns for accurate KPI
     const returnsMatch = { status: { $ne: 'cancelled' } };
+    if (match.warehouse) {
+      returnsMatch.warehouse = match.warehouse;
+    }
     if (startDate || endDate) {
       returnsMatch.createdAt = {};
       if (startDate) returnsMatch.createdAt.$gte = new Date(startDate);
@@ -149,7 +191,11 @@ exports.getSalesReport = async (req, res) => {
     }
     const returns = await Return.find(returnsMatch).lean();
     let totalReturnsAmount = 0;
-    returns.forEach(r => totalReturnsAmount += (r.totalRefundAmount || 0));
+    let totalRefundCost = 0;
+    returns.forEach(r => {
+      totalReturnsAmount += (r.totalRefundAmount || 0);
+      totalRefundCost += (r.totalRefundCost || 0);
+    });
 
     let totalRevenue = 0;
     let totalOrders = orders.length;
@@ -265,16 +311,21 @@ exports.getSalesReport = async (req, res) => {
 
     const chartData = Object.values(chartDataMap);
 
+    const netRevenue = Math.max(0, totalRevenue - totalReturnsAmount);
+    const lostProfit = Math.max(0, totalReturnsAmount - totalRefundCost);
+    const netProfit = Math.max(0, totalProfit - lostProfit);
+
     // Ruxsatlarga qarab tijoriy sirlarni yashirish
-    const hideSecret = req.user && req.user.role === 'cashier';
+    const hideSecret = req.user && (req.user.role === 'cashier' || req.user.role === 'seller');
 
     res.json({
        success: true,
        data: {
          kpi: {
-           revenue: totalRevenue,
+           grossRevenue: totalRevenue,
+           revenue: netRevenue,
            returnsAmount: totalReturnsAmount,
-           profit: hideSecret ? null : totalProfit,
+           profit: hideSecret ? null : netProfit,
            debt: hideSecret ? null : totalDebt,
            orders: totalOrders,
            quantity: totalQuantity,
@@ -295,9 +346,16 @@ exports.getSalesReport = async (req, res) => {
 
 exports.exportSalesExcel = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, warehouse } = req.query;
     
     let match = { status: { $ne: 'cancelled' } };
+
+    // ── Filial Izolyatsiyasi (IDOR Himoyasi) ──
+    if (req.user && req.user.role !== 'superadmin' && req.user.role !== 'admin') {
+      match.warehouse = req.user.warehouse;
+    } else if (warehouse && warehouse !== 'all' && warehouse !== 'Barchasi') {
+      match.warehouse = warehouse;
+    }
     
     if (startDate && endDate) {
       match.createdAt = {

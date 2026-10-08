@@ -271,16 +271,35 @@ exports.cancelOrder = async (req, res) => {
           );
         }
 
-        // Va to'langan pullarni minus qarz (store credit) qilib o'tkazish
+        // Agar buyurtmaga to'lov qilingan bo'lsa — kassa auditida to'lovni bekor qilish (Refund chiqimi)
+        if (order.paidAmount > 0) {
+          await Payment.create([{
+            order: order._id,
+            customer: order.customer,
+            warehouse: order.warehouse,
+            amount: -order.paidAmount,
+            method: order.paymentType === 'naqd' ? 'naqd' : 'karta',
+            notes: `Buyurtma bekor qilindi (#${order.orderNumber}): To'lov qaytarildi`,
+            receivedBy: req.user ? req.user.name : 'Tizim',
+            receivedById: req.user ? req.user._id : undefined
+          }], { session });
+        }
+
+        // Qarz va xarid hajmini qaytarish:
+        // Buyurtma tasdiqlanganda qarz faqat debtAmount miqdorida oshgan, shuning uchun faqat debtAmount qisqaradi
         await Customer.findByIdAndUpdate(order.customer, {
           $inc: {
-            totalDebt: -Math.max(0, order.debtAmount) - Math.max(0, order.paidAmount),
+            totalDebt: -Math.max(0, order.debtAmount),
             totalPurchased: -order.totalAmount
           }
         }, { session });
 
-        // Store credit uchun totalDebt manfiy bo'lishiga ruxsat beramiz.
-        // Safety: totalDebt check olib tashlandi.
+        // TotalDebt xavfsizligi
+        await Customer.updateOne(
+          { _id: order.customer, totalDebt: { $lt: 0 } },
+          { $set: { totalDebt: 0 } },
+          { session }
+        );
 
         // Reverse cashback
         const cashbackDelta = (order.cashbackUsed || 0) - (order.cashbackEarned || 0);
@@ -303,7 +322,7 @@ exports.cancelOrder = async (req, res) => {
     });
 
     // ─── Side effects (transaction tashqarisida) ───
-    // ✅ FIX #6: previousStatus ga asoslanib syncDeltas (order.status emas!)
+    // ✅ FIX: previousStatus ga asoslanib syncDeltas (order.status emas!)
     let syncDeltas = null;
     if (previousStatus === 'confirmed' || previousStatus === 'delivered') {
       syncDeltas = {
@@ -314,7 +333,8 @@ exports.cancelOrder = async (req, res) => {
         customer: {
           id: cancelledOrder.customer.toString(),
           debtDelta: -Math.max(0, cancelledOrder.debtAmount),
-          purchasedDelta: -cancelledOrder.totalAmount
+          purchasedDelta: -cancelledOrder.totalAmount,
+          cashRefund: cancelledOrder.paidAmount || 0
         }
       };
     }

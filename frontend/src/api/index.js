@@ -125,6 +125,7 @@ export const fetchProducts    = (params) => api.get('/products', { params }).the
 export const compareProducts  = (artikul, brand) => api.get('/products/compare', { params: { artikul, brand } }).then(extractData);
 export const getReplenishmentRecommendations = (warehouseId) => api.get('/products/replenishment', { params: { warehouseId } }).then(extractData);
 export const fetchProduct     = (id)     => api.get(`/products/${id}`).then(extractData);
+export const fetchProductHistory = (id) => api.get(`/products/${id}/history`).then(extractData);
 export const createProduct    = (formData) => api.post('/products', formData, {
   headers: { 'Content-Type': 'multipart/form-data' },
 }).then(extractData);
@@ -151,7 +152,12 @@ export const deleteCustomer   = (id)          => api.delete(`/customers/${id}`).
 // ─── Orders API ───────────────────────────────────────────────────────────────
 export const fetchOrders      = (params) => api.get('/orders', { params }).then(extractData);
 export const fetchOrderStats  = ()       => api.get('/orders/stats').then(extractData);
-export const createOrder      = (data)   => api.post('/orders', data).then(extractData);
+export const createOrder      = (data)   => {
+  const key = data?.idempotencyKey || `ord-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  return api.post('/orders', data, {
+    headers: { 'x-idempotency-key': key }
+  }).then(extractData);
+};
 export const confirmOrder     = (id)     => api.put(`/orders/${id}/confirm`).then(extractData);
 export const deliverOrder     = (id)     => api.put(`/orders/${id}/deliver`, { status: 'delivered' }).then(extractData);
 export const cancelOrder      = (id)     => api.put(`/orders/${id}/cancel`).then(extractData);
@@ -159,7 +165,15 @@ export const sendOrderReceiptToTelegram = (id, imageBase64) => api.post(`/orders
 
 // ─── Payments API ─────────────────────────────────────────────────────────────
 export const fetchPayments    = (params) => api.get('/payments', { params }).then(extractData);
-export const createPayment    = (data)   => api.post('/payments', data).then(extractData);
+export const createPayment    = (data)   => {
+  const key = data?.idempotencyKey || `pay-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+  return api.post('/payments', data, {
+    headers: { 'x-idempotency-key': key }
+  }).then(extractData);
+};
+export const fetchCustomerPayments = (customerId) => api.get(`/payments/customer/${customerId}`).then(extractData);
+export const deletePayment = (id) => api.delete(`/payments/${id}`).then(extractData);
+export const updatePayment = ({ id, data }) => api.put(`/payments/${id}`, data).then(extractData);
 
 // ─── Returns API ──────────────────────────────────────────────────────────────
 export const fetchReturns     = (params) => api.get('/returns', { params }).then(extractData);

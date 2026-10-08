@@ -112,3 +112,11 @@ export const useDeleteProduct = () => {
     }
   });
 };
+
+export const useProductHistory = (id) => {
+  return useQuery({
+    queryKey: ['productHistory', id],
+    queryFn: () => api.fetchProductHistory(id),
+    enabled: !!id
+  });
+};

@@ -4,6 +4,7 @@ import { Grid3X3 } from 'lucide-react';
 import { useProductsInfinite, useFilters, useDeleteProduct } from '../hooks/useProducts';
 import { useWarehouses } from '../hooks/useWarehouses';
 import ProductModal from '../components/ProductModal';
+import ProductHistoryDrawer from '../components/ProductHistoryDrawer';
 import BarcodeScannerModal from '../components/BarcodeScannerModal';
 import AiOrderParserModal from '../components/AiOrderParserModal';
 import { useCart } from '../contexts/CartContext';
@@ -28,6 +29,7 @@ const ProductsPage = () => {
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isAiParserOpen, setIsAiParserOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [historyDrawerProduct, setHistoryDrawerProduct] = useState(null);
   const [compareProduct, setCompareProduct] = useState(null);
   const [viewMode, setViewMode] = useState('grid');
   const [openDropdownId, setOpenDropdownId] = useState(null);
@@ -268,7 +270,7 @@ const ProductsPage = () => {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 min-[360px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 sm:gap-4 auto-rows-max">
             {products.map((product, index) => (
-              <ProductGridItem
+              <ProductGridItem onHistoryClick={() => setHistoryDrawerProduct(product)}
                 key={product._id}
                 ref={index === products.length - 1 ? lastProductElementRef : null}
                 product={product}
@@ -310,7 +312,7 @@ const ProductsPage = () => {
                 </thead>
                 <tbody>
                   {products.map((product, index) => (
-                    <ProductTableDesktopRow
+                    <ProductTableDesktopRow onHistoryClick={() => setHistoryDrawerProduct(product)}
                       key={product._id}
                       ref={index === products.length - 1 ? lastProductElementRef : null}
                       product={product}
@@ -336,7 +338,7 @@ const ProductsPage = () => {
             {/* Mobile Compact List View */}
             <div className="md:hidden flex flex-col divide-y divide-subtle/50">
               {products.map((product, idx) => (
-                <ProductTableMobileRow
+                <ProductTableMobileRow onHistoryClick={() => setHistoryDrawerProduct(product)}
                   key={`mobile-${product._id}`}
                   ref={idx === products.length - 1 ? lastProductElementRef : null}
                   product={product}
@@ -377,6 +379,7 @@ const ProductsPage = () => {
       <ConfirmModal isOpen={!!confirmWarehouseSwitch} onClose={() => setConfirmWarehouseSwitch(null)} onConfirm={handleConfirmWarehouseSwitch} title="Skladni almashtirish" message="Savatda boshqa skladdan mahsulot bor. Savatni tozalab, yangi skladdan boshlaymizmi?" confirmText="Almashtirish" cancelText="Bekor qilish" isDanger={true} />
       <CompareModal isOpen={!!compareProduct} onClose={() => setCompareProduct(null)} product={compareProduct} />
       {viewerImages && <ImageViewerModal images={viewerImages} onClose={() => setViewerImages(null)} />}
+      <ProductHistoryDrawer isOpen={!!historyDrawerProduct} onClose={() => setHistoryDrawerProduct(null)} product={historyDrawerProduct} />
     </div>
   );
 };

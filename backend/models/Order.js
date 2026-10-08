@@ -190,33 +190,41 @@ orderSchema.pre('save', async function() {
   this.items.forEach(item => {
     // Calculate subtotal
     const activeQuantity = Math.max(0, item.quantity - (item.returnedQuantity || 0));
-    const itemSubtotal = (item.unitPrice * activeQuantity) * (1 - (item.discount || 0) / 100);
+    const effectivePrice = Math.round(item.unitPrice * (1 - (item.discount || 0) / 100));
+    const itemSubtotal = Math.round(effectivePrice * activeQuantity);
     item.subtotal = itemSubtotal;
     calculatedTotal += itemSubtotal;
 
     // Calculate cost
-    const itemCost = (item.unitCost || 0) * activeQuantity;
+    const itemCost = Math.round((item.unitCost || 0) * activeQuantity);
     calculatedCost += itemCost;
   });
 
-  this.totalAmount = this.overrideTotalAmount !== undefined && this.overrideTotalAmount !== null
-    ? this.overrideTotalAmount
+  this.totalAmount = (this.overrideTotalAmount !== undefined && this.overrideTotalAmount !== null)
+    ? Math.round(Number(this.overrideTotalAmount))
     : calculatedTotal;
 
   this.totalCost = calculatedCost;
-  this.totalProfit = this.totalAmount - this.totalCost;
+  this.totalProfit = Math.max(0, this.totalAmount - this.totalCost);
 
   // Safety check for debtAmount
-  const totalPaidAndCashback = this.paidAmount + this.cashbackUsed;
+  const currentPaid = Math.round(this.paidAmount || 0);
+  const currentCashback = Math.round(this.cashbackUsed || 0);
+  const totalPaidAndCashback = currentPaid + currentCashback;
+
   if (totalPaidAndCashback > this.totalAmount) {
-    if (this.cashbackUsed <= this.totalAmount) {
-      this.paidAmount = this.totalAmount - this.cashbackUsed;
+    if (currentCashback <= this.totalAmount) {
+      this.paidAmount = this.totalAmount - currentCashback;
     } else {
       this.cashbackUsed = this.totalAmount;
       this.paidAmount = 0;
     }
+  } else {
+    this.paidAmount = currentPaid;
+    this.cashbackUsed = currentCashback;
   }
-  this.debtAmount = Math.max(0, this.totalAmount - this.paidAmount - this.cashbackUsed);
+
+  this.debtAmount = Math.max(0, this.totalAmount - (this.paidAmount || 0) - (this.cashbackUsed || 0));
 });
 
 // Performance & Scaling Indexes

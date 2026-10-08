@@ -12,6 +12,7 @@ const {
   getDashboardStats,
   getCompareProducts,
   getReplenishmentRecommendations,
+  getProductHistory,
   parseOrder
 } = require('../controllers/productController');
 
@@ -20,6 +21,7 @@ router.get('/stats/dashboard', getDashboardStats);
 router.get('/filters', getFilters);
 router.get('/compare', getCompareProducts);
 router.get('/replenishment', authorizeWithPermission('manage_products'), getReplenishmentRecommendations);
+router.get('/:id/history', getProductHistory);
 
 router.route('/')
   .get(getProducts)
