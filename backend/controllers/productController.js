@@ -854,8 +854,8 @@ exports.getProductHistory = async (req, res) => {
     orders.forEach(order => {
       const item = order.items.find(i => i.product.toString() === productId);
       if (item) {
-        // activeQuantity bu (sotilgan - qaytarilgan)
-        const activeQuantity = Math.max(0, item.quantity - (item.returnedQuantity || 0));
+        // activeQuantity bu (sotilgan - qaytarilgan - brak)
+        const activeQuantity = Math.max(0, item.quantity - (item.returnedQuantity || 0) - (item.defectQuantity || 0));
         totalSoldQty += item.quantity;
         const itemRevenue = (item.unitPrice * item.quantity) * (1 - (item.discount || 0) / 100);
         totalRevenue += itemRevenue;
@@ -872,7 +872,8 @@ exports.getProductHistory = async (req, res) => {
           unit: item.unit,
           unitPrice: item.unitPrice,
           revenue: itemRevenue,
-          returnedQuantity: item.returnedQuantity || 0
+          returnedQuantity: item.returnedQuantity || 0,
+          defectQuantity: item.defectQuantity || 0
         });
       }
     });

@@ -32,6 +32,12 @@ const orderItemSchema = new mongoose.Schema({
   returnedQuantity: {
     type: Number,
     default: 0,
+    min: 0,
+  },
+  defectQuantity: {
+    type: Number,
+    default: 0,
+    min: 0,
   },
   unitPrice: {
     type: Number,
@@ -188,8 +194,8 @@ orderSchema.pre('save', async function() {
   let calculatedTotal = 0;
   let calculatedCost = 0;
   this.items.forEach(item => {
-    // Calculate subtotal
-    const activeQuantity = Math.max(0, item.quantity - (item.returnedQuantity || 0));
+    // Calculate subtotal with activeQuantity formula: max(0, quantity - returnedQuantity - defectQuantity)
+    const activeQuantity = Math.max(0, item.quantity - (item.returnedQuantity || 0) - (item.defectQuantity || 0));
     const effectivePrice = Math.round(item.unitPrice * (1 - (item.discount || 0) / 100));
     const itemSubtotal = Math.round(effectivePrice * activeQuantity);
     item.subtotal = itemSubtotal;

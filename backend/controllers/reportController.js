@@ -249,7 +249,7 @@ exports.getSalesReport = async (req, res) => {
                 revenue: 0
               };
             }
-            const returnedQ = item.returnedQuantity || 0;
+            const returnedQ = (item.returnedQuantity || 0) + (item.defectQuantity || 0);
             const netQ = Math.max(0, item.quantity - returnedQ);
             // Bug Fix: `??` ishlatildi, shunday qilib `0` ni yolg'on deb hisoblamaydi
             const netRevenue = item.subtotal ?? (netQ * item.unitPrice * (1 - (item.discount || 0) / 100));
@@ -396,7 +396,7 @@ exports.exportSalesExcel = async (req, res) => {
                 revenue: 0
               };
             }
-            const returnedQ = item.returnedQuantity || 0;
+            const returnedQ = (item.returnedQuantity || 0) + (item.defectQuantity || 0);
             const netQ = Math.max(0, item.quantity - returnedQ);
             const netRevenue = item.subtotal ?? (netQ * item.unitPrice * (1 - (item.discount || 0) / 100));
 

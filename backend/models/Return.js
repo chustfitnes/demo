@@ -74,6 +74,11 @@ const returnSchema = new mongoose.Schema({
   reason: {
     type: String,
   },
+  returnType: {
+    type: String,
+    enum: ['standard', 'defective'],
+    default: 'standard',
+  },
   status: {
     type: String,
     enum: ['completed', 'cancelled'],

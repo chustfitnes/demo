@@ -9,8 +9,18 @@ const { logAction } = require('../utils/logger');
 exports.createReturn = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { orderId, items, reason } = req.body;
+    const { orderId, items, reason, returnType = 'standard' } = req.body;
     const io = req.app.get('io');
+
+    const isDefective = returnType === 'defective' || (reason && (
+      reason.toLowerCase().includes('brak') || 
+      reason.toLowerCase().includes('nuqson') || 
+      reason.toLowerCase().includes('yaroqsiz')
+    ));
+
+    if (isDefective && (!reason || !reason.trim())) {
+      throw new Error("Brak mahsulot uchun sabab (reason) ko'rsatilishi shart");
+    }
 
     let returnResult;
     let syncDeltas;
@@ -37,7 +47,8 @@ exports.createReturn = async (req, res) => {
           throw new Error('Maxsulot buyurtmada topilmadi');
         }
 
-        const availableToReturn = orderItem.quantity - (orderItem.returnedQuantity || 0);
+        // Limit: availableToReturn = quantity - returnedQuantity - defectQuantity
+        const availableToReturn = orderItem.quantity - (orderItem.returnedQuantity || 0) - (orderItem.defectQuantity || 0);
         if (returnItem.quantity > availableToReturn) {
           throw new Error(
             `Siz faqat ${availableToReturn} ta ${orderItem.unit} qaytara olasiz.`
@@ -52,8 +63,12 @@ exports.createReturn = async (req, res) => {
         const itemCost = (orderItem.unitCost || 0) * returnItem.quantity;
         totalRefundCost += itemCost;
 
-        // returnedQuantity yangilaymiz (order saqlanganda hisob-kitob bo'ladi)
-        orderItem.returnedQuantity = (orderItem.returnedQuantity || 0) + returnItem.quantity;
+        // returnType asosida returnedQuantity yoki defectQuantity yangilanadi
+        if (isDefective) {
+          orderItem.defectQuantity = (orderItem.defectQuantity || 0) + returnItem.quantity;
+        } else {
+          orderItem.returnedQuantity = (orderItem.returnedQuantity || 0) + returnItem.quantity;
+        }
 
         const { calculateQuantityInRolls } = require('../utils/unitConverter');
         const quantityInRolls = calculateQuantityInRolls(
@@ -83,21 +98,16 @@ exports.createReturn = async (req, res) => {
         items: processedItems,
         totalRefundAmount,
         totalRefundCost,
-        reason,
+        returnType: isDefective ? 'defective' : 'standard',
+        reason: reason || (isDefective ? 'Brak mahsulot' : 'Standard vozvrat'),
         processedBy: req.user ? req.user.name : 'Tizim',
         processedById: req.user ? req.user._id : null
       }], { session });
 
       // 4. Stock qaytarish — Brak (nuqsonli) tovarlarni sotuv omboridan ajratish
-      const isDefective = reason && (
-        reason.toLowerCase().includes('brak') || 
-        reason.toLowerCase().includes('nuqson') || 
-        reason.toLowerCase().includes('yaroqsiz')
-      );
-
       for (let item of processedItems) {
         if (isDefective) {
-          // Brak bo'lsa — faqat defectiveQuantity ga yoziladi, qayta sotuvga chiqmaydi
+          // Brak bo'lsa — faqat defectiveQuantity ga yoziladi, sotuv omboriga (quantity) QAYTMAYDI!
           await Product.findByIdAndUpdate(
             item.product,
             { $inc: { defectiveQuantity: item.quantityInRolls } },
@@ -113,7 +123,7 @@ exports.createReturn = async (req, res) => {
         }
       }
 
-      // 5. Order'ni yangilash (pre-save hook totalAmount va debtAmount'ni qayta hisoblaydi)
+      // 5. Order'ni yangilash (pre-save hook activeQuantity, totalAmount va debtAmount'ni qayta hisoblaydi)
       // 6. Mijoz qarzini kamaytirish va Cashback ni qaytarib olish
       const oldDebtAmount = order.debtAmount || 0;
 
@@ -125,9 +135,10 @@ exports.createReturn = async (req, res) => {
       if (order.overrideTotalAmount !== undefined && order.overrideTotalAmount !== null) {
         order.overrideTotalAmount = Math.max(0, order.overrideTotalAmount - totalRefundAmount);
       }
+      const noteLabel = isDefective ? `Brak qayd etildi: ${returnDoc.returnNumber}` : `Qisman qaytarildi: ${returnDoc.returnNumber}`;
       order.notes = order.notes
-        ? `${order.notes} | Qisman qaytarildi: ${returnDoc.returnNumber}`
-        : `Qisman qaytarildi: ${returnDoc.returnNumber}`;
+        ? `${order.notes} | ${noteLabel}`
+        : noteLabel;
 
       await order.save({ session });
 
@@ -279,28 +290,50 @@ exports.getReturns = async (req, res) => {
   }
 };
 
-// ✅ FIX #3 (quickReturn ham): Transactionsiz stock update'ni himoya qilamiz
+// ✅ FIX #3 (quickReturn ham): Transactionsiz stock update'ni himoya qilamiz + Brak va Mijoz integratsiyasi
 exports.quickReturn = async (req, res) => {
+  // Agar buyurtma tanlangan bo'lsa — to'g'ridan-to'g'ri to'liq tekshiruvchi createReturn ga yo'naltiramiz
+  if (req.body.orderId) {
+    return exports.createReturn(req, res);
+  }
+
   const session = await mongoose.startSession();
   try {
-    const { items, totalRefundAmount, reason, warehouse } = req.body;
+    const { items, totalRefundAmount = 0, reason, warehouse, returnType = 'standard', customerId } = req.body;
     const io = req.app.get('io');
 
-    let returnResult;
-    let syncDeltas;
-    let populatedReturn;
+    const isDefective = returnType === 'defective' || (reason && (
+      reason.toLowerCase().includes('brak') || 
+      reason.toLowerCase().includes('nuqson') || 
+      reason.toLowerCase().includes('yaroqsiz')
+    ));
+
+    if (isDefective && (!reason || !reason.trim())) {
+      throw new Error("Brak mahsulot uchun sabab (reason) ko'rsatilishi shart");
+    }
 
     if (totalRefundAmount < 0) {
       throw new Error("Qaytariladigan summa manfiy bo'lishi mumkin emas.");
     }
 
+    let returnResult;
+    let syncDeltas;
+    let populatedReturn;
+    let debtReduction = 0;
+    let customerDoc = null;
+
     await session.withTransaction(async () => {
       let processedItems = [];
       let calculatedTotalRefundCost = 0;
+      let effectiveWarehouse = warehouse || (req.user && req.user.warehouse);
 
       for (let returnItem of items) {
         const product = await Product.findById(returnItem.product).session(session);
         if (!product) continue;
+
+        if (!effectiveWarehouse && product.warehouse) {
+          effectiveWarehouse = product.warehouse;
+        }
 
         const { calculateQuantityInRolls } = require('../utils/unitConverter');
         const quantityInRolls = calculateQuantityInRolls(
@@ -329,31 +362,75 @@ exports.quickReturn = async (req, res) => {
         throw new Error('Qaytariladigan mahsulotlar yaroqsiz');
       }
 
+      if (!effectiveWarehouse) {
+        throw new Error('Omborxona (filial) aniqlanmadi');
+      }
+
       const returnDoc = new Return({
-        warehouse,
+        warehouse: effectiveWarehouse,
+        customer: customerId || null,
         items: processedItems,
-        totalRefundAmount: totalRefundAmount || 0,
+        totalRefundAmount: Number(totalRefundAmount) || 0,
         totalRefundCost: calculatedTotalRefundCost,
-        reason: reason || 'Tezkor vozvrat',
-        processedBy: req.user ? req.user.name : 'Tizim'
+        returnType: isDefective ? 'defective' : 'standard',
+        reason: reason || (isDefective ? 'Brak mahsulot' : 'Tezkor vozvrat'),
+        processedBy: req.user ? req.user.name : 'Tizim',
+        processedById: req.user ? req.user._id : null
       });
       await returnDoc.save({ session });
 
-      // Atomic stock qaytarish
+      // Ombor zaxirasini yangilash
       for (let item of processedItems) {
-        await Product.findByIdAndUpdate(
-          item.product,
-          { $inc: { quantity: item.quantityInRolls, soldQuantity: -item.quantityInRolls } },
-          { session }
-        );
+        if (isDefective) {
+          // Brak bo'lsa — faqat defectiveQuantity ga yoziladi, sotuv omboriga (quantity) QAYTMAYDI!
+          await Product.findByIdAndUpdate(
+            item.product,
+            { $inc: { defectiveQuantity: item.quantityInRolls } },
+            { session }
+          );
+        } else {
+          // Soz tovar — sotuv omboriga qaytadi
+          await Product.findByIdAndUpdate(
+            item.product,
+            { $inc: { quantity: item.quantityInRolls, soldQuantity: -item.quantityInRolls } },
+            { session }
+          );
+        }
+      }
+
+      // Agar mijoz tanlangan bo'lsa va qaytariladigan summa bo'lsa
+      if (customerId && totalRefundAmount > 0) {
+        customerDoc = await Customer.findById(customerId).session(session);
+        if (customerDoc) {
+          debtReduction = Math.min(customerDoc.totalDebt || 0, Number(totalRefundAmount));
+          await Customer.findByIdAndUpdate(
+            customerId,
+            {
+              $inc: {
+                totalDebt: -debtReduction,
+                totalPurchased: -Number(totalRefundAmount)
+              }
+            },
+            { session }
+          );
+          await Customer.updateOne(
+            { _id: customerId, totalDebt: { $lt: 0 } },
+            { $set: { totalDebt: 0 } },
+            { session }
+          );
+        }
       }
 
       syncDeltas = {
         products: processedItems.map(item => ({
           id: item.product.toString(),
-          delta: item.quantityInRolls
+          delta: isDefective ? 0 : item.quantityInRolls
         })),
-        customer: null
+        customer: customerDoc ? {
+          id: customerId.toString(),
+          debtDelta: -debtReduction,
+          purchasedDelta: -Number(totalRefundAmount)
+        } : null
       };
 
       returnResult = returnDoc;
@@ -362,6 +439,7 @@ exports.quickReturn = async (req, res) => {
     // ─── Side effects ───
     populatedReturn = await Return.findById(returnResult._id)
       .populate('warehouse', 'name')
+      .populate('customer', 'name phone')
       .populate('items.product', 'brand artikul polka category');
 
     const whId = returnResult.warehouse?._id || returnResult.warehouse;
@@ -377,7 +455,7 @@ exports.quickReturn = async (req, res) => {
 
     await logAction(
       req, 'RETURN', 'Return', returnResult._id,
-      `Tezkor vozvrat: ${returnResult.returnNumber}`
+      `${isDefective ? 'Brak vozvrat' : 'Tezkor vozvrat'}: ${returnResult.returnNumber}`
     );
 
     res.status(201).json({ success: true, data: populatedReturn });

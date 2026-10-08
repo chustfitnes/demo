@@ -100,6 +100,11 @@ const Sidebar = ({ isOpen, onClose }) => {
           label: "Qarzlar",
           badge: debtorsCount > 0 ? debtorsCount : null,
         },
+        {
+          to: "/quick-return",
+          icon: RefreshCcw,
+          label: "Vozvrat",
+        },
       ],
     },
     {
