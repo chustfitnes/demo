@@ -204,6 +204,7 @@ const QuickReturnPage = () => {
       createOrderReturnMutation.mutate({
         orderId: selectedOrderId,
         items: itemsPayload,
+        totalRefundAmount: refundAmountStr !== '' ? Number(refundAmountStr) : undefined,
         reason: reason.trim() || (isDefective ? 'Brak vozvrat' : 'Tezkor vozvrat'),
         returnType
       }, {

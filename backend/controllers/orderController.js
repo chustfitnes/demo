@@ -271,18 +271,9 @@ exports.cancelOrder = async (req, res) => {
           );
         }
 
-        // Agar buyurtmaga to'lov qilingan bo'lsa — kassa auditida to'lovni bekor qilish (Refund chiqimi)
+        // Agar buyurtmaga to'lov qilingan bo'lsa — order.paidAmount bekor qilinadi
         if (order.paidAmount > 0) {
-          await Payment.create([{
-            order: order._id,
-            customer: order.customer,
-            warehouse: order.warehouse,
-            amount: -order.paidAmount,
-            method: order.paymentType === 'naqd' ? 'naqd' : 'karta',
-            notes: `Buyurtma bekor qilindi (#${order.orderNumber}): To'lov qaytarildi`,
-            receivedBy: req.user ? req.user.name : 'Tizim',
-            receivedById: req.user ? req.user._id : undefined
-          }], { session });
+          order.paidAmount = 0;
         }
 
         // Qarz va xarid hajmini qaytarish:

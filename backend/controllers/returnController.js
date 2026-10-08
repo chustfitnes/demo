@@ -9,7 +9,7 @@ const { logAction } = require('../utils/logger');
 exports.createReturn = async (req, res) => {
   const session = await mongoose.startSession();
   try {
-    const { orderId, items, reason, returnType = 'standard' } = req.body;
+    const { orderId, items, reason, returnType = 'standard', totalRefundAmount: customRefundAmount } = req.body;
     const io = req.app.get('io');
 
     const isDefective = returnType === 'defective' || (reason && (
@@ -34,7 +34,7 @@ exports.createReturn = async (req, res) => {
 
       if (!order) throw new Error('Buyurtma topilmadi');
 
-      let totalRefundAmount = 0;
+      let calculatedRefundAmount = 0;
       let totalRefundCost = 0;
       const processedItems = [];
 
@@ -58,7 +58,7 @@ exports.createReturn = async (req, res) => {
         const itemSubtotal =
           (orderItem.unitPrice * returnItem.quantity) *
           (1 - (orderItem.discount || 0) / 100);
-        totalRefundAmount += itemSubtotal;
+        calculatedRefundAmount += itemSubtotal;
 
         const itemCost = (orderItem.unitCost || 0) * returnItem.quantity;
         totalRefundCost += itemCost;
@@ -89,6 +89,10 @@ exports.createReturn = async (req, res) => {
           unitCostUsd: orderItem.unitCostUsd || 0
         });
       }
+
+      const totalRefundAmount = (customRefundAmount !== undefined && customRefundAmount !== null && customRefundAmount !== '')
+        ? Math.max(0, Number(customRefundAmount))
+        : calculatedRefundAmount;
 
       // 3. Return hujjati yaratish
       const [returnDoc] = await Return.create([{
@@ -144,21 +148,6 @@ exports.createReturn = async (req, res) => {
 
       const debtReduction = Math.max(0, oldDebtAmount - order.debtAmount);
       const cashRefundAmount = Math.max(0, totalRefundAmount - debtReduction);
-
-      // Agar mijoz naqd to'lagan bo'lsa — kassa chiqimi (Refund Payment) rasmiylashtiriladi
-      if (cashRefundAmount > 0) {
-        const Payment = require('../models/Payment');
-        await Payment.create([{
-          order: order._id,
-          customer: order.customer,
-          warehouse: order.warehouse,
-          amount: -cashRefundAmount,
-          method: order.paymentType === 'naqd' ? 'naqd' : 'karta',
-          notes: `Vozvrat chiqimi (#${returnDoc.returnNumber}): Naqd qaytarildi`,
-          receivedBy: req.user ? req.user.name : 'Tizim',
-          receivedById: req.user ? req.user._id : undefined
-        }], { session });
-      }
 
       // ✅ FIX: Integer arithmetic — tiyindagi floating point xatosining oldini olish
       const returnRatioMicro = Math.round(totalRefundAmount * 1_000_000 / snapshotTotalAmount);
